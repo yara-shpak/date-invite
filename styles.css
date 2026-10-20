@@ -1,0 +1,517 @@
+@font-face {
+  font-family: "Bogart";
+  src: url("fonts/bogart-medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/jetbrains-mono.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+/*
+  Уся сцена зверстана в координатах фігма-фрейму 360×600 і масштабується
+  під екран: --u — один «фігма-піксель».
+  --e — одиниця фрейму «Конверт» (836 px завширшки), приведена до розміру
+  відкритого конверта на фреймі 11 (461 px).
+  --s — один піксель закритого конверта з фрейму 13 (301 px) у просторі конверта.
+*/
+:root {
+  --red: #e91111;
+  --paper: #f7f3ed;
+  --ink: #330000;
+
+  --u: min(calc(100vw / 360), calc(100vh / 600));
+  --e: calc(var(--u) * 461 / 836);
+  --s: calc(var(--u) * 461 / 301);
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --u: min(calc(100vw / 360), calc(100dvh / 600));
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--red);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+img {
+  display: block;
+  max-width: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  pointer-events: none;
+}
+
+.scene {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--red);
+  touch-action: manipulation;
+}
+
+/* ---------- блискітки ----------
+   Як зерно у фреймі 14: лежать поверх усього, і конверта, і листа. */
+
+.sparkles,
+.sparkles__layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sparkles {
+  z-index: 10;
+  pointer-events: none;
+}
+
+.sparkles__layer--a {
+  animation: twinkle 3.2s ease-in-out infinite;
+}
+
+.sparkles__layer--b {
+  animation: twinkle 4.6s ease-in-out -2.1s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparkles__layer--a,
+  .sparkles__layer--b {
+    animation: none;
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---------- сцена 360×600 ---------- */
+
+.stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(360 * var(--u));
+  height: calc(600 * var(--u));
+  transform: translate(-50%, -50%);
+}
+
+.title {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(360 * var(--u));
+  height: calc(200 * var(--u));
+  overflow: visible;
+  pointer-events: none;
+}
+
+.title__stroke {
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- конверт ----------
+   Базова геометрія — відкритий стан з фрейму 11 (461×357, центр 174.14/493.82, поворот 3.39°).
+   Закритий стан з фрейму 13 задається з JS через scale/xPercent/yPercent. */
+
+.envelope {
+  position: absolute;
+  left: calc(-56.36 * var(--u));
+  top: calc(315.43 * var(--u));
+  width: calc(461 * var(--u));
+  height: calc(356.78 * var(--u));
+  visibility: hidden;
+}
+
+.envelope__shadow {
+  position: absolute;
+  inset: 0;
+  box-shadow: 0 calc(222 * var(--e)) calc(180 * var(--e)) rgba(51, 0, 0, 0.59);
+}
+
+.envelope__body {
+  position: absolute;
+  inset: 0;
+  perspective: calc(1300 * var(--e));
+  perspective-origin: 50% 40%;
+}
+
+.envelope__body > * {
+  position: absolute;
+}
+
+.env-back {
+  left: 0;
+  top: 0;
+  width: calc(836 * var(--e));
+  height: calc(647 * var(--e));
+  z-index: 1;
+}
+
+.env-left {
+  left: calc(-20 * var(--e));
+  top: calc(-20 * var(--e));
+  width: calc(498 * var(--e));
+  height: calc(727 * var(--e));
+  z-index: 3;
+}
+
+.env-right {
+  left: calc(358 * var(--e));
+  top: calc(-20 * var(--e));
+  width: calc(498 * var(--e));
+  height: calc(727 * var(--e));
+  z-index: 3;
+}
+
+.env-bottom {
+  left: 0;
+  top: calc(281 * var(--e));
+  width: calc(876 * var(--e));
+  height: calc(386 * var(--e));
+  z-index: 3;
+}
+
+/* Клапан обертається навколо верхнього краю. До 90° він над кишенею,
+   після — ховається під лист (клас .is-open ставить JS). */
+.flap {
+  left: 0;
+  top: 0;
+  width: calc(836 * var(--e));
+  height: calc(392 * var(--e));
+  z-index: 4;
+  transform-origin: 50% 0;
+}
+
+.flap.is-open {
+  z-index: 0;
+}
+
+.flap__face {
+  position: absolute;
+  inset: 0;
+}
+
+.flap__face > img {
+  position: absolute;
+  left: 0;
+  transform: scaleY(-1);
+}
+
+.flap__front > img {
+  top: calc(-20 * var(--e));
+  width: calc(876 * var(--e));
+  height: calc(431 * var(--e));
+}
+
+/* Після перевороту основа заходить під задню стінку на 3 одиниці — без шва на згині. */
+.flap__back > img {
+  top: calc(-3 * var(--e));
+  width: calc(836 * var(--e));
+  height: calc(392 * var(--e));
+}
+
+.flap__back,
+.flap.is-open .flap__front {
+  visibility: hidden;
+}
+
+.flap.is-open .flap__back {
+  visibility: visible;
+}
+
+/* Печатка — координати фрейму 13 відносно закритого конверта (30, 183). */
+.seal {
+  position: absolute;
+  left: calc(101 * var(--s));
+  top: calc(87 * var(--s));
+  width: calc(98 * var(--s));
+  height: calc(98 * var(--s));
+}
+
+.seal > img {
+  position: absolute;
+}
+
+.seal__outer {
+  left: calc(-2.078 * var(--s));
+  top: calc(-3.675 * var(--s));
+  width: calc(106.164 * var(--s));
+  height: calc(109.348 * var(--s));
+}
+
+.seal__inner {
+  left: calc(15.368 * var(--s));
+  top: calc(14.024 * var(--s));
+  width: calc(67.257 * var(--s));
+  height: calc(69.955 * var(--s));
+}
+
+.seal__print {
+  left: calc(31 * var(--s));
+  top: calc(31 * var(--s));
+  width: calc(36 * var(--s));
+  height: calc(36 * var(--s));
+  mix-blend-mode: hard-light;
+}
+
+/* ---------- лист ---------- */
+
+/* Обрізає лист по нижньому краю конверта, поки він усередині. */
+.letter-clip {
+  inset: 0;
+  z-index: 2;
+  -webkit-clip-path: inset(-300% -100% 0 -100%);
+  clip-path: inset(-300% -100% 0 -100%);
+}
+
+.letter-anchor {
+  position: absolute;
+  left: calc(408.52 * var(--e));
+  top: calc(-16.23 * var(--e));
+  width: 0;
+  height: 0;
+}
+
+.letter {
+  position: absolute;
+  left: calc(-149 * var(--u));
+  top: calc(-252.5 * var(--u));
+  width: calc(298 * var(--u));
+  height: calc(505 * var(--u));
+  padding: calc(24 * var(--u));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(27 * var(--u));
+  background: var(--paper);
+  border-radius: calc(8 * var(--u));
+  color: var(--ink);
+  text-align: center;
+  outline: none;
+}
+
+.letter__shadow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: calc(20 * var(--u)) calc(10 * var(--u)) calc(15 * var(--u)) rgba(51, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.letter p {
+  margin: 0;
+}
+
+.letter__lead,
+.letter__mono {
+  position: relative;
+  width: 100%;
+}
+
+.letter__lead {
+  font-family: "Bogart", "Georgia", serif;
+  font-weight: 500;
+  font-size: calc(20 * var(--u));
+  line-height: 0.9;
+  letter-spacing: calc(-0.6 * var(--u));
+}
+
+.letter__mono {
+  font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-weight: 400;
+  font-size: calc(14 * var(--u));
+  line-height: 1.27;
+  letter-spacing: calc(-0.84 * var(--u));
+}
+
+.letter__gap {
+  margin-top: 1.27em !important;
+}
+
+.letter__agree {
+  position: relative;
+  flex: none;
+  margin: 0;
+  padding: calc(14 * var(--u)) calc(32 * var(--u));
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: calc(200 * var(--u));
+  background: var(--red);
+  box-shadow:
+    calc(2 * var(--u)) calc(2 * var(--u)) calc(5 * var(--u)) rgba(51, 0, 0, 0.59),
+    inset calc(-10 * var(--u)) calc(-10 * var(--u)) calc(17 * var(--u)) rgba(51, 0, 0, 0.4),
+    inset calc(10 * var(--u)) calc(10 * var(--u)) calc(17 * var(--u)) rgba(255, 255, 255, 0.3);
+  color: #f4f0ea;
+  font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-weight: 400;
+  font-size: calc(14 * var(--u));
+  line-height: 1.27;
+  letter-spacing: calc(-0.84 * var(--u));
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: filter 0.25s ease;
+}
+
+.letter__agree:focus {
+  outline: none;
+}
+
+.letter__agree:focus-visible {
+  outline: calc(1.5 * var(--u)) dashed var(--ink);
+  outline-offset: calc(4 * var(--u));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .letter__agree:hover {
+    filter: brightness(1.08);
+  }
+}
+
+/* ---------- напис «Дуже чекаю на зустріч» ----------
+   Фрейм 14: конверт там трохи вищий і більший (×1.00987), тому розміри
+   поділені на цей масштаб, а поворот конверта компенсовано. */
+
+.message-anchor {
+  left: calc(406.75 * var(--e));
+  top: calc(-53.19 * var(--e));
+  width: 0;
+  height: 0;
+  z-index: 1;
+}
+
+.message {
+  position: absolute;
+  left: calc(-149.306 * var(--u));
+  top: calc(-41.828 * var(--u));
+  width: calc(298.612 * var(--u));
+  height: calc(83.655 * var(--u));
+  overflow: visible;
+  transform: rotate(-3.39deg);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.message__stroke {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- закрити ----------
+   По горизонталі — правий край сцени, по вертикалі — верх екрана. */
+
+.close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 10 * var(--u));
+  right: calc(max(0px, (100vw - 360 * var(--u)) / 2) + 11 * var(--u));
+  width: calc(54 * var(--u));
+  height: calc(54 * var(--u));
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  visibility: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.close > img {
+  position: absolute;
+}
+
+.close__seal {
+  left: calc(-4.741 * var(--u));
+  top: calc(-5.616 * var(--u));
+  width: calc(67.478 * var(--u));
+  height: calc(69.232 * var(--u));
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.close__x {
+  left: calc(20 * var(--u));
+  top: calc(20 * var(--u));
+  width: calc(14 * var(--u));
+  height: calc(13.5 * var(--u));
+}
+
+.close:focus {
+  outline: none;
+}
+
+.close:focus-visible {
+  outline: calc(1.5 * var(--u)) dashed rgba(247, 243, 237, 0.8);
+  outline-offset: calc(4 * var(--u));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .close:hover .close__seal {
+    transform: rotate(30deg);
+  }
+}
+
+/* ---------- зона натискання ---------- */
+
+.envelope__hit {
+  position: absolute;
+  inset: -8% -6%;
+  z-index: 10;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: calc(24 * var(--u));
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.envelope__hit:focus {
+  outline: none;
+}
+
+.envelope__hit:focus-visible {
+  outline: calc(2 * var(--u)) dashed rgba(247, 243, 237, 0.7);
+  outline-offset: calc(-6 * var(--u));
+}
+
+.envelope.is-opened .envelope__hit {
+  display: none;
+}
